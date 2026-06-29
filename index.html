@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="株価情報" />
+  <title>株価影響情報ダッシュボード</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --text-primary: #1a1a18;
+      --text-secondary: #5f5e5a;
+      --text-muted: #888780;
+      --text-accent: #185fa5;
+      --text-success: #3b6d11;
+      --text-danger: #a32d2d;
+      --text-warning: #854f0b;
+      --surface-0: #f1efe8;
+      --surface-1: #f7f6f1;
+      --surface-2: #ffffff;
+      --border: rgba(0,0,0,0.12);
+      --border-accent: #85b7eb;
+      --bg-accent: #e6f1fb;
+      --bg-success: #eaf3de;
+      --bg-danger: #fcebeb;
+      --bg-warning: #faeeda;
+      --fill-accent: #378add;
+      --radius: 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-primary: #e8e6df;
+        --text-secondary: #b4b2a9;
+        --text-muted: #888780;
+        --text-accent: #85b7eb;
+        --text-success: #97c459;
+        --text-danger: #f09595;
+        --text-warning: #ef9f27;
+        --surface-0: #1c1c1a;
+        --surface-1: #252522;
+        --surface-2: #2e2e2b;
+        --border: rgba(255,255,255,0.1);
+        --border-accent: #185fa5;
+        --bg-accent: #042c53;
+        --bg-success: #173404;
+        --bg-danger: #501313;
+        --bg-warning: #412402;
+        --fill-accent: #378add;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      background: var(--surface-0);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 1rem;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .header { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; }
+    .header h1 { font-size: 18px; font-weight: 500; }
+    .search-row { display: flex; gap: 8px; margin-bottom: 1rem; }
+    .search-row input {
+      flex: 1; padding: 8px 12px; border: 0.5px solid var(--border);
+      border-radius: var(--radius); background: var(--surface-2);
+      color: var(--text-primary); font-size: 14px; outline: none;
+    }
+    .search-row input:focus { border-color: var(--fill-accent); }
+    button {
+      padding: 8px 16px; border: 0.5px solid var(--border);
+      border-radius: var(--radius); background: var(--surface-2);
+      color: var(--text-primary); font-size: 14px; cursor: pointer;
+    }
+    button:hover { background: var(--surface-1); }
+    .ticker-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+    .ticker-tag {
+      font-size: 12px; padding: 4px 10px; border-radius: var(--radius);
+      background: var(--surface-1); color: var(--text-secondary);
+      border: 0.5px solid var(--border); cursor: pointer;
+    }
+    .ticker-tag.active { background: var(--bg-accent); color: var(--text-accent); border-color: var(--border-accent); }
+    .tabs { display: flex; gap: 4px; border-bottom: 0.5px solid var(--border); margin-bottom: 1rem; }
+    .tab {
+      padding: 8px 14px; font-size: 14px; color: var(--text-secondary);
+      cursor: pointer; border: none; background: none;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .tab.active { color: var(--text-accent); border-bottom-color: var(--fill-accent); }
+    .section-title {
+      font-size: 12px; font-weight: 500; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;
+    }
+    .news-item { padding: 12px 0; border-bottom: 0.5px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+    .news-item:last-child { border-bottom: none; }
+    .news-title { font-size: 14px; line-height: 1.4; }
+    .news-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .news-source { font-size: 12px; color: var(--text-muted); }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: var(--radius); }
+    .badge-up { background: var(--bg-success); color: var(--text-success); }
+    .badge-down { background: var(--bg-danger); color: var(--text-danger); }
+    .badge-neutral { background: var(--surface-1); color: var(--text-secondary); border: 0.5px solid var(--border); }
+    .badge-warning { background: var(--bg-warning); color: var(--text-warning); }
+    .indicator-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 1rem; }
+    .indicator-card { background: var(--surface-1); border-radius: var(--radius); padding: 12px; }
+    .indicator-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+    .indicator-value { font-size: 18px; font-weight: 500; }
+    .indicator-change { font-size: 12px; margin-top: 2px; }
+    .up { color: var(--text-success); }
+    .down { color: var(--text-danger); }
+    .social-item { padding: 10px 0; border-bottom: 0.5px solid var(--border); display: flex; gap: 12px; }
+    .social-item:last-child { border-bottom: none; }
+    .social-left { display: flex; flex-direction: column; gap: 4px; min-width: 80px; }
+    .social-platform { font-size: 11px; padding: 2px 6px; border-radius: var(--radius); background: var(--surface-1); color: var(--text-secondary); border: 0.5px solid var(--border); text-align: center; }
+    .social-ticker { font-size: 12px; color: var(--text-accent); font-weight: 500; }
+    .social-text { font-size: 13px; line-height: 1.5; flex: 1; }
+    .ask-btn { width: 100%; margin-top: 1rem; padding: 10px; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <i class="ti ti-chart-line" style="font-size:22px;color:var(--text-accent)"></i>
+  <h1>株価影響情報ダッシュボード</h1>
+</div>
+
+<div class="search-row">
+  <input type="text" id="tickerInput" placeholder="銘柄を追加（例：AAPL、7203）" />
+  <button onclick="addTicker()">追加</button>
+</div>
+
+<div class="ticker-tags" id="tickerTags"></div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('news', this)">ニュース</button>
+  <button class="tab" onclick="switchTab('indicators', this)">経済指標</button>
+  <button class="tab" onclick="switchTab('social', this)">SNS話題</button>
+</div>
+
+<div id="tab-news">
+  <div class="section-title">最新ニュース（日米）</div>
+  <div id="newsList"></div>
+</div>
+
+<div id="tab-indicators" style="display:none">
+  <div class="section-title">主要経済指標</div>
+  <div class="indicator-grid" id="indicatorGrid"></div>
+  <div class="section-title" style="margin-top:1rem">今週の注目イベント</div>
+  <div id="eventList"></div>
+</div>
+
+<div id="tab-social" style="display:none">
+  <div class="section-title">SNS・掲示板 話題ランキング</div>
+  <div id="socialList"></div>
+</div>
+
+<script>
+let activeTickers = ['NVDA', 'AAPL', '7203', '6758', 'SPY'];
+
+const mockNews = [
+  { title: 'Fed、次回会合での利下げ示唆 — 市場に安堵感', source: 'Reuters', time: '2時間前', impact: 'up', tickers: ['SPY', 'AAPL'] },
+  { title: '日銀、追加利上げを慎重に検討との報道', source: 'Bloomberg', time: '3時間前', impact: 'down', tickers: ['7203', '6758'] },
+  { title: 'NVIDIA、次世代GPU「Blackwell Ultra」の量産開始を発表', source: 'Nikkei', time: '5時間前', impact: 'up', tickers: ['NVDA'] },
+  { title: '米中半導体規制、再び強化へ — 輸出ルール見直し', source: 'WSJ', time: '7時間前', impact: 'down', tickers: ['NVDA', 'AAPL'] },
+  { title: 'トヨタ、2026年度の北米販売台数予測を上方修正', source: '日経新聞', time: '9時間前', impact: 'up', tickers: ['7203'] },
+  { title: 'Apple、インドでのiPhone生産を大幅拡大方針', source: 'FT', time: '12時間前', impact: 'neutral', tickers: ['AAPL'] },
+  { title: 'ソニー、映画・音楽事業の分社化を検討か', source: '読売新聞', time: '1日前', impact: 'warning', tickers: ['6758'] },
+];
+
+const mockIndicators = [
+  { label: '米CPI（前年比）', value: '3.2%', change: '+0.1%', up: false },
+  { label: '米10年債利回り', value: '4.28%', change: '-0.03%', up: false },
+  { label: 'ドル/円', value: '157.42', change: '+0.38', up: true },
+  { label: 'VIX（恐怖指数）', value: '18.4', change: '-1.2', up: false },
+  { label: 'S&P500', value: '5,480', change: '+0.6%', up: true },
+  { label: '日経平均', value: '38,640', change: '-0.4%', up: false },
+];
+
+const mockEvents = [
+  { date: '7/1（火）', event: '米ISM製造業景況指数', importance: 'high' },
+  { date: '7/2（水）', event: 'ADP雇用統計（米）', importance: 'high' },
+  { date: '7/3（木）', event: '米新規失業保険申請件数', importance: 'medium' },
+  { date: '7/4（金）', event: '米雇用統計（非農業部門雇用者数）', importance: 'high' },
+];
+
+const mockSocial = [
+  { platform: 'X（旧Twitter）', ticker: '$NVDA', text: 'Blackwell Ultra発表でNVDA急騰の声多数。アナリストの目標株価引き上げ相次ぐ。', sentiment: 'up' },
+  { platform: 'Reddit r/investing', ticker: '$SPY', text: 'Fedの発言を受けてブル派が優勢。「Buy the dip」コメントが急増中。', sentiment: 'up' },
+  { platform: '株ちゃんねる', ticker: '7203', text: 'トヨタの北米好調でBUY勢多いが、円安リスクを指摘する声も根強い。', sentiment: 'neutral' },
+  { platform: 'X（旧Twitter）', ticker: '$AAPL', text: '米中規制強化でApple供給網への不安広がる。ショート増加の観測も。', sentiment: 'down' },
+  { platform: 'Reddit r/wallstreetbets', ticker: '$NVDA', text: 'AI関連の決算期待でコールオプション大量購入。ギャンブル的な動きも目立つ。', sentiment: 'warning' },
+];
+
+function renderTickers() {
+  document.getElementById('tickerTags').innerHTML = activeTickers.map(t =>
+    `<span class="ticker-tag active" onclick="removeTicker('${t}')">${t} ×</span>`
+  ).join('');
+}
+
+function addTicker() {
+  const val = document.getElementById('tickerInput').value.trim().toUpperCase();
+  if (val && !activeTickers.includes(val)) { activeTickers.push(val); renderTickers(); }
+  document.getElementById('tickerInput').value = '';
+}
+
+function removeTicker(t) {
+  if (activeTickers.length === 1) return;
+  activeTickers = activeTickers.filter(x => x !== t);
+  renderTickers();
+}
+
+function renderNews() {
+  const impactLabel = { up: '上昇要因', down: '下落要因', neutral: '中立', warning: '注目' };
+  const impactClass = { up: 'badge-up', down: 'badge-down', neutral: 'badge-neutral', warning: 'badge-warning' };
+  document.getElementById('newsList').innerHTML = mockNews.map(n => `
+    <div class="news-item">
+      <div class="news-title">${n.title}</div>
+      <div class="news-meta">
+        <span class="news-source">${n.source} · ${n.time}</span>
+        <span class="badge ${impactClass[n.impact]}">${impactLabel[n.impact]}</span>
+        ${n.tickers.map(t => `<span style="font-size:11px;color:var(--text-accent);font-weight:500">${t}</span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function renderIndicators() {
+  document.getElementById('indicatorGrid').innerHTML = mockIndicators.map(i => `
+    <div class="indicator-card">
+      <div class="indicator-label">${i.label}</div>
+      <div class="indicator-value">${i.value}</div>
+      <div class="indicator-change ${i.up ? 'up' : 'down'}">${i.up ? '▲' : '▼'} ${i.change}</div>
+    </div>`).join('');
+  const importanceMap = { high: 'badge-down', medium: 'badge-warning' };
+  const importanceLabel = { high: '重要', medium: '注目' };
+  document.getElementById('eventList').innerHTML = mockEvents.map(e => `
+    <div class="news-item">
+      <div class="news-meta">
+        <span class="news-source">${e.date}</span>
+        <span class="badge ${importanceMap[e.importance]}">${importanceLabel[e.importance]}</span>
+      </div>
+      <div class="news-title">${e.event}</div>
+    </div>`).join('');
+}
+
+function renderSocial() {
+  const sentimentClass = { up: 'badge-up', down: 'badge-down', neutral: 'badge-neutral', warning: 'badge-warning' };
+  const sentimentIcon = { up: '↑ 強気', down: '↓ 弱気', neutral: '→ 中立', warning: '⚠ 過熱' };
+  document.getElementById('socialList').innerHTML = mockSocial.map(s => `
+    <div class="social-item">
+      <div class="social-left">
+        <span class="social-platform">${s.platform}</span>
+        <span class="social-ticker">${s.ticker}</span>
+        <span class="badge ${sentimentClass[s.sentiment]}" style="font-size:10px;text-align:center">${sentimentIcon[s.sentiment]}</span>
+      </div>
+      <div class="social-text">${s.text}</div>
+    </div>`).join('');
+}
+
+function switchTab(name, btn) {
+  ['news', 'indicators', 'social'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? '' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+renderTickers();
+renderNews();
+renderIndicators();
+renderSocial();
+</script>
+</body>
+</html>
