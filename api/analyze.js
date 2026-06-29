@@ -32,9 +32,11 @@ export default async function handler(req, res) {
 - "中"：ある程度の影響が見込まれる要因
 - "弱"：限定的な影響にとどまる要因
 
-各要因について、必ずWeb検索を行い、その根拠となった具体的なニュース記事を特定してください。そして、その記事の「発行日」を "date"（例："2026-06-28"）、媒体名を "source"（例："日経新聞"、"Reuters"）として必ず付けてください。Web検索をして実際の記事を見つけてから要因を書いてください。日付が本当に特定できない場合のみ "date" を空文字 "" にしてください。
+各要因について、必ずWeb検索を行い、その根拠となった具体的なニュース記事を特定してください。そして、その記事の「発行日」を "date"（例："2026-06-28"）、媒体名を "source"（例："日経新聞"、"Reuters"）、記事のURLを "url" として必ず付けてください。Web検索をして実際の記事を見つけてから要因を書いてください。日付が本当に特定できない場合のみ "date" を空文字 "" にしてください。URLも特定できない場合のみ空文字 "" にしてください。
 
 また、現在の株価水準からの今後の方向性を、短期（1か月以内）・中期（1〜3か月）・長期（3か月〜1年）の3つの期間別に予測してください。それぞれ "up"（上昇）/"flat"（横ばい）/"down"（下降）のいずれかと、その可能性の度合い（"高"/"中"/"低"）、および一言の理由を付けてください。これはあくまで参考予測であり確実なものではない前提で構いません。
+
+さらに、現在のチャートのテクニカル分析を行ってください。Web検索で現在の株価、移動平均線（25日・75日など）、RSI、MACD、出来高、サポート/レジスタンスなどの情報を可能な範囲で調べ、テクニカル的に見た上昇/下落の可能性を判断してください。"direction"（up/flat/down）、"probability"（高/中/低）、主要な根拠を3つ程度の "signals"（配列）、および "summary"（総括・40文字以内）を付けてください。正確な数値が得られない場合は、入手できた範囲の情報で判断して構いません。
 
 さらに、各銘柄について「今後4か月以内に予定されている、株価に影響を及ぼしそうなイベント」も調べてください。例：決算発表、新製品発表、株主総会、製品ローンチ、規制当局の判断期日、重要な業界カンファレンスなど。予定が見つからない場合は空配列にしてください。
 
@@ -53,11 +55,17 @@ export default async function handler(req, res) {
         "mid": { "direction": "up/flat/down", "probability": "高/中/低", "reason": "理由（短め）" },
         "long": { "direction": "up/flat/down", "probability": "高/中/低", "reason": "理由（短め）" }
       },
+      "technical": {
+        "direction": "up/flat/down",
+        "probability": "高/中/低",
+        "signals": ["根拠1", "根拠2", "根拠3"],
+        "summary": "総括（40文字以内）"
+      },
       "bullish": [
-        { "text": "上昇要因の内容", "impact": "強 または 中 または 弱", "date": "YYYY-MM-DD", "source": "媒体名" }
+        { "text": "上昇要因の内容", "impact": "強 または 中 または 弱", "date": "YYYY-MM-DD", "source": "媒体名", "url": "記事URL" }
       ],
       "bearish": [
-        { "text": "下落要因の内容", "impact": "強 または 中 または 弱", "date": "YYYY-MM-DD", "source": "媒体名" }
+        { "text": "下落要因の内容", "impact": "強 または 中 または 弱", "date": "YYYY-MM-DD", "source": "媒体名", "url": "記事URL" }
       ],
       "events": [
         { "date": "YYYY-MM-DD", "title": "イベント名", "impact": "強 または 中 または 弱" }
@@ -75,7 +83,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 3000,
+        max_tokens: 4000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{ role: 'user', content: prompt }]
       })
