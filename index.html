@@ -51,13 +51,21 @@
     .badge-down { background: var(--bg-danger); color: var(--text-danger); }
     .badge-neutral { background: var(--surface-1); color: var(--text-secondary); border: 0.5px solid var(--border); }
     .card-summary { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
-    .factor-group { margin-top: 10px; }
-    .factor-label { font-size: 12px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+    .factor-group { margin-top: 12px; }
+    .factor-label { font-size: 12px; font-weight: 500; margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
     .factor-label.bull { color: var(--text-success); }
     .factor-label.bear { color: var(--text-danger); }
     .factor-list { list-style: none; }
-    .factor-list li { font-size: 13px; line-height: 1.5; padding: 3px 0 3px 16px; position: relative; }
-    .factor-list li::before { content: '・'; position: absolute; left: 0; }
+    .factor-item { font-size: 13px; line-height: 1.5; padding: 6px 0; display: flex; gap: 8px; align-items: flex-start; border-bottom: 0.5px solid var(--border); }
+    .factor-item:last-child { border-bottom: none; }
+    .factor-text { flex: 1; }
+    .impact { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: var(--radius); white-space: nowrap; flex-shrink: 0; }
+    .impact-strong-up { background: var(--text-success); color: #fff; }
+    .impact-mid-up { background: var(--bg-success); color: var(--text-success); }
+    .impact-weak-up { background: var(--surface-1); color: var(--text-success); border: 0.5px solid var(--border); }
+    .impact-strong-down { background: var(--text-danger); color: #fff; }
+    .impact-mid-down { background: var(--bg-danger); color: var(--text-danger); }
+    .impact-weak-down { background: var(--surface-1); color: var(--text-danger); border: 0.5px solid var(--border); }
   </style>
 </head>
 <body>
@@ -137,6 +145,31 @@ async function analyze() {
   }
 }
 
+function impactClass(impact, dir) {
+  const map = {
+    '強': dir === 'up' ? 'impact-strong-up' : 'impact-strong-down',
+    '中': dir === 'up' ? 'impact-mid-up' : 'impact-mid-down',
+    '弱': dir === 'up' ? 'impact-weak-up' : 'impact-weak-down'
+  };
+  return map[impact] || (dir === 'up' ? 'impact-mid-up' : 'impact-mid-down');
+}
+
+function sortByImpact(arr) {
+  const order = { '強': 0, '中': 1, '弱': 2 };
+  return [...arr].sort((a, b) => (order[a.impact] ?? 1) - (order[b.impact] ?? 1));
+}
+
+function renderFactor(item, dir) {
+  // 古い形式（文字列）にも対応
+  if (typeof item === 'string') {
+    return `<li class="factor-item"><span class="factor-text">${item}</span></li>`;
+  }
+  return `<li class="factor-item">
+    <span class="factor-text">${item.text}</span>
+    <span class="impact ${impactClass(item.impact, dir)}">${dir === 'up' ? '上昇' : '下落'}・${item.impact || '中'}</span>
+  </li>`;
+}
+
 function renderResults(analysis) {
   const results = document.getElementById('results');
   if (!analysis.length) { results.innerHTML = '<div class="loading">結果がありませんでした</div>'; return; }
@@ -144,25 +177,28 @@ function renderResults(analysis) {
   const sentLabel = { up: '上昇傾向', down: '下落傾向', neutral: '中立' };
   const sentClass = { up: 'badge-up', down: 'badge-down', neutral: 'badge-neutral' };
 
-  results.innerHTML = analysis.map(a => `
+  results.innerHTML = analysis.map(a => {
+    const bull = sortByImpact(a.bullish || []);
+    const bear = sortByImpact(a.bearish || []);
+    return `
     <div class="card">
       <div class="card-header">
         <span class="card-ticker">${a.ticker}</span>
         <span class="badge ${sentClass[a.sentiment] || 'badge-neutral'}">${sentLabel[a.sentiment] || '中立'}</span>
       </div>
       <div class="card-summary">${a.summary || ''}</div>
-      ${a.bullish && a.bullish.length ? `
+      ${bull.length ? `
         <div class="factor-group">
           <div class="factor-label bull"><i class="ti ti-trending-up"></i> 上昇要因</div>
-          <ul class="factor-list">${a.bullish.map(b => `<li>${b}</li>`).join('')}</ul>
+          <ul class="factor-list">${bull.map(b => renderFactor(b, 'up')).join('')}</ul>
         </div>` : ''}
-      ${a.bearish && a.bearish.length ? `
+      ${bear.length ? `
         <div class="factor-group">
           <div class="factor-label bear"><i class="ti ti-trending-down"></i> 下落要因</div>
-          <ul class="factor-list">${a.bearish.map(b => `<li>${b}</li>`).join('')}</ul>
+          <ul class="factor-list">${bear.map(b => renderFactor(b, 'down')).join('')}</ul>
         </div>` : ''}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 renderTickers();
