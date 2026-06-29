@@ -95,6 +95,29 @@
     .forecast-note { font-size: 10px; color: var(--text-muted); margin-top: 6px; }
     .tech-signals { list-style: none; margin: 6px 0 0; }
     .tech-signal { font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding: 1px 0; }
+    .main-tabs { display: flex; gap: 4px; border-bottom: 0.5px solid var(--border); margin-bottom: 1.25rem; }
+    .main-tab { padding: 10px 18px; font-size: 14px; color: var(--text-secondary); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .main-tab.active { color: var(--text-accent); border-bottom-color: var(--fill-accent); }
+    .track-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 1.25rem; }
+    .track-stat { background: var(--surface-1); border-radius: var(--radius); padding: 12px; text-align: center; }
+    .track-stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+    .track-stat-value { font-size: 22px; font-weight: 500; }
+    .track-card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .track-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .track-card-ticker { font-size: 15px; font-weight: 500; }
+    .track-card-date { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+    .track-pred-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; }
+    .track-pred-row:last-child { border-bottom: none; }
+    .track-term { font-size: 12px; color: var(--text-secondary); min-width: 92px; }
+    .track-pred-dir { font-weight: 500; padding: 2px 10px; border-radius: var(--radius); font-size: 12px; white-space: nowrap; }
+    .track-judge-btns { display: flex; gap: 4px; margin-left: auto; }
+    .judge-btn { font-size: 12px; padding: 4px 10px; border-radius: var(--radius); cursor: pointer; border: 0.5px solid var(--border); background: var(--surface-2); }
+    .judge-btn.hit-on { background: var(--text-success); color: #fff; border-color: var(--text-success); }
+    .judge-btn.miss-on { background: var(--text-danger); color: #fff; border-color: var(--text-danger); }
+    .judge-btn.pending-on { background: var(--surface-1); color: var(--text-secondary); }
+    .track-empty { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 14px; }
+    .track-delete { font-size: 11px; color: var(--text-muted); cursor: pointer; background: none; border: none; padding: 2px 6px; }
+    .track-delete:hover { color: var(--text-danger); }
   </style>
 </head>
 <body>
@@ -113,11 +136,22 @@
 
 <div class="usage-bar" id="usageBar"></div>
 
-<button class="analyze-btn" id="analyzeBtn" onclick="analyze()">
-  <i class="ti ti-sparkles"></i> AIに影響度を分析させる
-</button>
+<div class="main-tabs">
+  <button class="main-tab active" id="mtab-analyze" onclick="switchMainTab('analyze')">分析</button>
+  <button class="main-tab" id="mtab-track" onclick="switchMainTab('track')">予測の的中率</button>
+</div>
 
-<div id="results"></div>
+<div id="view-analyze">
+  <button class="analyze-btn" id="analyzeBtn" onclick="analyze()">
+    <i class="ti ti-sparkles"></i> AIに影響度を分析させる
+  </button>
+  <div id="results"></div>
+</div>
+
+<div id="view-track" style="display:none">
+  <div id="trackSummary"></div>
+  <div id="trackList"></div>
+</div>
 
 <script>
 const STORAGE_KEY = 'stock_dashboard_tickers_v3';
@@ -212,6 +246,8 @@ async function analyze() {
     }
 
     renderResults(data.analysis || []);
+    // AIの予測を的中率トラッキング用に保存
+    recordPredictions(data.analysis || []);
   } catch(e) {
     results.innerHTML = `<div class="error">分析に失敗しました：${e.message}<br>しばらくしてからもう一度お試しください。</div>`;
   } finally {
@@ -371,6 +407,142 @@ function renderResults(analysis) {
           <ul class="factor-list">${sortEvents(a.events).map(ev => renderEvent(ev)).join('')}</ul>
         </div>` : ''}
     </div>`;
+  }).join('');
+}
+
+// ===== 予測トラッキング =====
+const PRED_KEY = 'stock_dashboard_predictions';
+
+function loadPredictions() {
+  try { const s = localStorage.getItem(PRED_KEY); return s ? JSON.parse(s) : []; } catch(e) { return []; }
+}
+function savePredictions(p) { try { localStorage.setItem(PRED_KEY, JSON.stringify(p)); } catch(e) {} }
+
+// 分析結果から予測を保存（短期・中期・長期それぞれ1レコード）
+function recordPredictions(analysis) {
+  const preds = loadPredictions();
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  analysis.forEach(a => {
+    if (!a.forecast) return;
+    const terms = [
+      { key: 'short', label: '短期(1か月)' },
+      { key: 'mid', label: '中期(1-3か月)' },
+      { key: 'long', label: '長期(3か月-1年)' }
+    ];
+    terms.forEach(t => {
+      const f = a.forecast[t.key];
+      if (!f) return;
+      preds.push({
+        id: `${dateStr}_${a.ticker}_${t.key}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+        date: dateStr,
+        ticker: a.ticker,
+        name: a.name || '',
+        term: t.label,
+        direction: f.direction,
+        probability: f.probability || '',
+        result: 'pending'  // pending / hit / miss
+      });
+    });
+  });
+  savePredictions(preds);
+}
+
+function setResult(id, result) {
+  const preds = loadPredictions();
+  const p = preds.find(x => x.id === id);
+  if (p) {
+    p.result = (p.result === result) ? 'pending' : result;
+    savePredictions(preds);
+    renderTrack();
+  }
+}
+
+function deletePrediction(id) {
+  let preds = loadPredictions();
+  preds = preds.filter(x => x.id !== id);
+  savePredictions(preds);
+  renderTrack();
+}
+
+function deleteGroup(date, ticker) {
+  let preds = loadPredictions();
+  preds = preds.filter(x => !(x.date === date && x.ticker === ticker));
+  savePredictions(preds);
+  renderTrack();
+}
+
+function switchMainTab(name) {
+  document.getElementById('view-analyze').style.display = name === 'analyze' ? '' : 'none';
+  document.getElementById('view-track').style.display = name === 'track' ? '' : 'none';
+  document.getElementById('mtab-analyze').classList.toggle('active', name === 'analyze');
+  document.getElementById('mtab-track').classList.toggle('active', name === 'track');
+  if (name === 'track') renderTrack();
+}
+
+function renderTrack() {
+  const preds = loadPredictions();
+  const summary = document.getElementById('trackSummary');
+  const list = document.getElementById('trackList');
+
+  if (!preds.length) {
+    summary.innerHTML = '';
+    list.innerHTML = '<div class="track-empty">まだ予測の記録がありません。<br>「分析」タブでAI分析を実行すると、予測がここに記録されます。</div>';
+    return;
+  }
+
+  const judged = preds.filter(p => p.result !== 'pending');
+  const hits = preds.filter(p => p.result === 'hit').length;
+  const misses = preds.filter(p => p.result === 'miss').length;
+  const pending = preds.filter(p => p.result === 'pending').length;
+  const rate = judged.length ? Math.round(hits / judged.length * 100) : 0;
+
+  summary.innerHTML = `
+    <div class="track-stat-grid">
+      <div class="track-stat"><div class="track-stat-label">的中率</div><div class="track-stat-value">${judged.length ? rate + '%' : '—'}</div></div>
+      <div class="track-stat"><div class="track-stat-label">的中</div><div class="track-stat-value" style="color:var(--text-success)">${hits}</div></div>
+      <div class="track-stat"><div class="track-stat-label">外れ</div><div class="track-stat-value" style="color:var(--text-danger)">${misses}</div></div>
+      <div class="track-stat"><div class="track-stat-label">判定待ち</div><div class="track-stat-value" style="color:var(--text-muted)">${pending}</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:1rem">※予測が当たったか外れたかは、実際の値動きを確認してご自身で記録してください。</div>
+  `;
+
+  const dirLabel = { up: '上昇', flat: '横ばい', down: '下降' };
+  const dirClass = { up: 'dir-up', flat: 'dir-flat', down: 'dir-down' };
+
+  // 新しい予測が上に来るよう、日付の降順でグループ化
+  const groups = {};
+  preds.forEach(p => {
+    const k = `${p.date}__${p.ticker}`;
+    if (!groups[k]) groups[k] = { date: p.date, ticker: p.ticker, name: p.name, rows: [] };
+    groups[k].rows.push(p);
+  });
+  const sortedGroups = Object.values(groups).sort((a, b) => b.date.localeCompare(a.date) || a.ticker.localeCompare(b.ticker));
+
+  list.innerHTML = sortedGroups.map(g => {
+    const dateDisp = new Date(g.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+    const rows = g.rows.map(p => `
+      <div class="track-pred-row">
+        <span class="track-term">${p.term}</span>
+        <span class="track-pred-dir ${dirClass[p.direction] || 'dir-flat'}">${dirLabel[p.direction] || '横ばい'}</span>
+        <span style="font-size:11px;color:var(--text-muted)">可能性${p.probability || '中'}</span>
+        <span class="track-judge-btns">
+          <button class="judge-btn ${p.result === 'hit' ? 'hit-on' : ''}" onclick="setResult('${p.id}','hit')">的中</button>
+          <button class="judge-btn ${p.result === 'miss' ? 'miss-on' : ''}" onclick="setResult('${p.id}','miss')">外れ</button>
+        </span>
+      </div>`).join('');
+    return `
+      <div class="track-card">
+        <div class="track-card-head">
+          <span class="track-card-ticker">${g.ticker}</span>
+          ${g.name ? `<span style="font-size:12px;color:var(--text-secondary)">${g.name}</span>` : ''}
+          <span class="track-card-date">${dateDisp}</span>
+        </div>
+        ${rows}
+        <div style="text-align:right;margin-top:6px">
+          <button class="track-delete" onclick="deleteGroup('${g.date}','${g.ticker}')"><i class="ti ti-trash" style="font-size:11px"></i> この記録を削除</button>
+        </div>
+      </div>`;
   }).join('');
 }
 
