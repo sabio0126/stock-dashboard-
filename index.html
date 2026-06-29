@@ -78,6 +78,18 @@
     .usage-label { color: var(--text-muted); font-size: 11px; }
     .usage-value { font-size: 14px; font-weight: 500; color: var(--text-primary); }
     .usage-note { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+    .card-name { font-size: 13px; color: var(--text-secondary); font-weight: 400; }
+    .forecast { margin-top: 12px; background: var(--surface-1); border-radius: var(--radius); padding: 10px 12px; }
+    .forecast-title { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 8px; }
+    .forecast-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+    .forecast-term { font-size: 12px; color: var(--text-secondary); min-width: 64px; }
+    .forecast-dir { font-weight: 500; padding: 2px 10px; border-radius: var(--radius); font-size: 12px; white-space: nowrap; }
+    .dir-up { background: var(--bg-success); color: var(--text-success); }
+    .dir-flat { background: var(--surface-2); color: var(--text-secondary); border: 0.5px solid var(--border); }
+    .dir-down { background: var(--bg-danger); color: var(--text-danger); }
+    .forecast-prob { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+    .forecast-reason { font-size: 12px; color: var(--text-secondary); flex: 1; }
+    .forecast-note { font-size: 10px; color: var(--text-muted); margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -228,6 +240,27 @@ function renderFactor(item, dir) {
   </li>`;
 }
 
+function renderForecast(f) {
+  const dirLabel = { up: '上昇', flat: '横ばい', down: '下降' };
+  const dirClass = { up: 'dir-up', flat: 'dir-flat', down: 'dir-down' };
+  const row = (term, data) => {
+    if (!data) return '';
+    return `<div class="forecast-row">
+      <span class="forecast-term">${term}</span>
+      <span class="forecast-dir ${dirClass[data.direction] || 'dir-flat'}">${dirLabel[data.direction] || '横ばい'}</span>
+      <span class="forecast-prob">可能性${data.probability || '中'}</span>
+      <span class="forecast-reason">${data.reason || ''}</span>
+    </div>`;
+  };
+  return `<div class="forecast">
+    <div class="forecast-title"><i class="ti ti-chart-arrows-vertical" style="font-size:13px"></i> AIによる方向予測</div>
+    ${row('短期(1か月)', f.short)}
+    ${row('中期(1-3か月)', f.mid)}
+    ${row('長期(3か月-1年)', f.long)}
+    <div class="forecast-note">※AIによる参考予測です。投資判断はご自身の責任で行ってください。</div>
+  </div>`;
+}
+
 function formatNewsDate(dateStr) {
   // "2026-06-28" → "6月28日" のように整形。失敗したらそのまま返す
   const d = new Date(dateStr);
@@ -276,9 +309,11 @@ function renderResults(analysis) {
     <div class="card">
       <div class="card-header">
         <span class="card-ticker">${a.ticker}</span>
+        ${a.name ? `<span class="card-name">${a.name}</span>` : ''}
         <span class="badge ${sentClass[a.sentiment] || 'badge-neutral'}">${sentLabel[a.sentiment] || '中立'}</span>
       </div>
       <div class="card-summary">${a.summary || ''}</div>
+      ${a.forecast ? renderForecast(a.forecast) : ''}
       ${bull.length ? `
         <div class="factor-group">
           <div class="factor-label bull"><i class="ti ti-trending-up"></i> 上昇要因</div>
@@ -291,7 +326,7 @@ function renderResults(analysis) {
         </div>` : ''}
       ${a.events && a.events.length ? `
         <div class="factor-group">
-          <div class="factor-label event"><i class="ti ti-calendar-event"></i> 今後の予定イベント（2か月以内）</div>
+          <div class="factor-label event"><i class="ti ti-calendar-event"></i> 今後の予定イベント（4か月以内）</div>
           <ul class="factor-list">${sortEvents(a.events).map(ev => renderEvent(ev)).join('')}</ul>
         </div>` : ''}
     </div>`;
