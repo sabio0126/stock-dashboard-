@@ -32,34 +32,15 @@
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --text-primary: #e8e6df;
-        --text-secondary: #b4b2a9;
-        --text-muted: #888780;
-        --text-accent: #85b7eb;
-        --text-success: #97c459;
-        --text-danger: #f09595;
-        --text-warning: #ef9f27;
-        --surface-0: #1c1c1a;
-        --surface-1: #252522;
-        --surface-2: #2e2e2b;
-        --border: rgba(255,255,255,0.1);
-        --border-accent: #185fa5;
-        --bg-accent: #042c53;
-        --bg-success: #173404;
-        --bg-danger: #501313;
-        --bg-warning: #412402;
-        --fill-accent: #378add;
+        --text-primary: #e8e6df; --text-secondary: #b4b2a9; --text-muted: #888780;
+        --text-accent: #85b7eb; --text-success: #97c459; --text-danger: #f09595;
+        --text-warning: #ef9f27; --surface-0: #1c1c1a; --surface-1: #252522;
+        --surface-2: #2e2e2b; --border: rgba(255,255,255,0.1); --border-accent: #185fa5;
+        --bg-accent: #042c53; --bg-success: #173404; --bg-danger: #501313;
+        --bg-warning: #412402; --fill-accent: #378add;
       }
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-      background: var(--surface-0);
-      color: var(--text-primary);
-      min-height: 100vh;
-      padding: 1rem;
-      max-width: 680px;
-      margin: 0 auto;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: var(--surface-0); color: var(--text-primary); min-height: 100vh; padding: 1rem; max-width: 680px; margin: 0 auto; }
     .header { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; }
     .header h1 { font-size: 18px; font-weight: 500; flex: 1; }
     .refresh-btn { background: none; border: 0.5px solid var(--border); border-radius: var(--radius); padding: 6px 10px; cursor: pointer; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; gap: 4px; }
@@ -76,16 +57,10 @@
     .section-title { font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
     .news-item { padding: 12px 0; border-bottom: 0.5px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
     .news-item:last-child { border-bottom: none; }
-    .news-title { font-size: 14px; line-height: 1.4; }
-    .news-title a { color: var(--text-primary); text-decoration: none; }
+    .news-title a { font-size: 14px; line-height: 1.4; color: var(--text-primary); text-decoration: none; }
     .news-title a:hover { color: var(--text-accent); }
     .news-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .news-source { font-size: 12px; color: var(--text-muted); }
-    .badge { font-size: 11px; padding: 2px 8px; border-radius: var(--radius); }
-    .badge-up { background: var(--bg-success); color: var(--text-success); }
-    .badge-down { background: var(--bg-danger); color: var(--text-danger); }
-    .badge-neutral { background: var(--surface-1); color: var(--text-secondary); border: 0.5px solid var(--border); }
-    .badge-warning { background: var(--bg-warning); color: var(--text-warning); }
     .indicator-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 1rem; }
     .indicator-card { background: var(--surface-1); border-radius: var(--radius); padding: 12px; }
     .indicator-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
@@ -94,8 +69,13 @@
     .up { color: var(--text-success); }
     .down { color: var(--text-danger); }
     .loading { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 14px; }
-    .error { text-align: center; padding: 1rem; color: var(--text-danger); font-size: 13px; background: var(--bg-danger); border-radius: var(--radius); margin-bottom: 1rem; }
+    .error { padding: 1rem; color: var(--text-danger); font-size: 13px; background: var(--bg-danger); border-radius: var(--radius); margin-bottom: 1rem; }
     .last-updated { font-size: 11px; color: var(--text-muted); text-align: right; margin-bottom: 0.5rem; }
+    .news-links { margin-top: 1rem; padding: 1rem; background: var(--surface-1); border-radius: var(--radius); }
+    .news-links p { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+    .news-links a { display: block; font-size: 14px; color: var(--text-accent); text-decoration: none; padding: 6px 0; border-bottom: 0.5px solid var(--border); }
+    .news-links a:last-child { border-bottom: none; }
+    .news-links a:hover { color: var(--text-primary); }
   </style>
 </head>
 <body>
@@ -132,20 +112,14 @@
 </div>
 
 <script>
-const NEWS_API_KEY = '04439f7644ff4882a2c4b1a8785c0b82';
-const STORAGE_KEY = 'stock_dashboard_tickers';
-
+const STORAGE_KEY = 'stock_dashboard_tickers_v2';
 const defaultTickers = ['NVDA', 'AAPL', '7203', '6758', 'SPY'];
 
 function loadTickers() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [...defaultTickers];
-  } catch(e) { return [...defaultTickers]; }
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : [...defaultTickers]; } catch(e) { return [...defaultTickers]; }
 }
-
-function saveTickers(tickers) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers)); } catch(e) {}
+function saveTickers(t) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); } catch(e) {}
 }
 
 let activeTickers = loadTickers();
@@ -155,78 +129,54 @@ function renderTickers() {
     `<span class="ticker-tag" onclick="removeTicker('${t}')">${t} ×</span>`
   ).join('');
 }
-
 function addTicker() {
   const val = document.getElementById('tickerInput').value.trim().toUpperCase();
-  if (val && !activeTickers.includes(val)) {
-    activeTickers.push(val);
-    saveTickers(activeTickers);
-    renderTickers();
-    fetchNews();
-  }
+  if (val && !activeTickers.includes(val)) { activeTickers.push(val); saveTickers(activeTickers); renderTickers(); renderNews(); }
   document.getElementById('tickerInput').value = '';
 }
-
 function removeTicker(t) {
   if (activeTickers.length === 1) return;
   activeTickers = activeTickers.filter(x => x !== t);
   saveTickers(activeTickers);
   renderTickers();
-  fetchNews();
+  renderNews();
 }
 
-async function fetchNews() {
+function renderNews() {
   const el = document.getElementById('newsList');
-  el.innerHTML = '<div class="loading">ニュースを取得中...</div>';
+  const query = encodeURIComponent(activeTickers.join(' OR ') + ' 株価 OR 株式 OR 経済');
+  const enQuery = encodeURIComponent(activeTickers.join(' OR ') + ' stock market');
 
-  const query = activeTickers.join(' OR ') + ' OR 株式 OR 株価 OR 日経 OR S&P500 OR 経済指標';
+  const now = new Date();
+  document.getElementById('newsUpdated').textContent = `最終更新：${now.toLocaleTimeString('ja-JP')}`;
 
-  try {
-    const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&language=jp&sortBy=publishedAt&pageSize=20&apiKey=${NEWS_API_KEY}`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.status !== 'ok') throw new Error(data.message || 'API error');
-
-    const articles = data.articles.filter(a => a.title && a.title !== '[Removed]');
-
-    if (articles.length === 0) {
-      // 英語でも試す
-      const url2 = `https://newsapi.org/v2/everything?q=${encodeURIComponent(activeTickers.join(' OR ') + ' stock market')}&language=en&sortBy=publishedAt&pageSize=20&apiKey=${NEWS_API_KEY}`;
-      const res2 = await fetch(url2);
-      const data2 = await res2.json();
-      renderNews(data2.articles || []);
-    } else {
-      renderNews(articles);
-    }
-
-    const now = new Date();
-    document.getElementById('newsUpdated').textContent = `最終更新：${now.toLocaleTimeString('ja-JP')}`;
-
-  } catch(e) {
-    el.innerHTML = `<div class="error">ニュースの取得に失敗しました。しばらくしてから「更新」を押してください。<br><small>${e.message}</small></div>`;
-  }
-}
-
-function renderNews(articles) {
-  const el = document.getElementById('newsList');
-  if (!articles || articles.length === 0) {
-    el.innerHTML = '<div class="loading">ニュースが見つかりませんでした</div>';
-    return;
-  }
-
-  el.innerHTML = articles.slice(0, 15).map(a => {
-    const date = new Date(a.publishedAt);
-    const timeStr = date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const title = a.title.replace(' - ' + a.source.name, '');
-    return `
-      <div class="news-item">
-        <div class="news-title"><a href="${a.url}" target="_blank">${title}</a></div>
-        <div class="news-meta">
-          <span class="news-source">${a.source.name} · ${timeStr}</span>
-        </div>
-      </div>`;
-  }).join('');
+  el.innerHTML = `
+    <div class="news-links">
+      <p>以下のリンクから最新ニュースを確認できます（タップで開きます）</p>
+      <a href="https://news.google.com/search?q=${query}&hl=ja&gl=JP&ceid=JP:ja" target="_blank">
+        <i class="ti ti-external-link" style="font-size:14px;margin-right:4px"></i>Google ニュース（日本語）で検索
+      </a>
+      <a href="https://news.google.com/search?q=${enQuery}&hl=ja&gl=JP&ceid=JP:ja" target="_blank">
+        <i class="ti ti-external-link" style="font-size:14px;margin-right:4px"></i>Google ニュース（英語）で検索
+      </a>
+      <a href="https://www.nikkei.com/markets/" target="_blank">
+        <i class="ti ti-external-link" style="font-size:14px;margin-right:4px"></i>日経新聞 マーケット
+      </a>
+      <a href="https://finance.yahoo.co.jp/" target="_blank">
+        <i class="ti ti-external-link" style="font-size:14px;margin-right:4px"></i>Yahoo ファイナンス（日本）
+      </a>
+      <a href="https://finance.yahoo.com/news/" target="_blank">
+        <i class="ti ti-external-link" style="font-size:14px;margin-right:4px"></i>Yahoo Finance（米国）
+      </a>
+      <a href="https://www.bloomberg.co.jp/markets" target="_blank">
+        <i class="ti ti-external-link" style="font-size:14px;margin-right:4px"></i>Bloomberg Japan マーケット
+      </a>
+    </div>
+    <div style="margin-top:1rem;padding:0.75rem;background:var(--bg-warning);border-radius:var(--radius);font-size:13px;color:var(--text-warning)">
+      <i class="ti ti-info-circle" style="font-size:14px;margin-right:4px"></i>
+      ブラウザのセキュリティ制限によりニュースの自動取得ができないため、リンク形式にしています。
+    </div>
+  `;
 }
 
 const mockIndicators = [
@@ -237,7 +187,6 @@ const mockIndicators = [
   { label: 'S&P500', value: '5,480', change: '+0.6%', up: true },
   { label: '日経平均', value: '38,640', change: '-0.4%', up: false },
 ];
-
 const mockEvents = [
   { date: '7/1（火）', event: '米ISM製造業景況指数', importance: 'high' },
   { date: '7/2（水）', event: 'ADP雇用統計（米）', importance: 'high' },
@@ -252,34 +201,25 @@ function renderIndicators() {
       <div class="indicator-value">${i.value}</div>
       <div class="indicator-change ${i.up ? 'up' : 'down'}">${i.up ? '▲' : '▼'} ${i.change}</div>
     </div>`).join('');
-
   const importanceMap = { high: 'badge-down', medium: 'badge-warning' };
   const importanceLabel = { high: '重要', medium: '注目' };
   document.getElementById('eventList').innerHTML = mockEvents.map(e => `
     <div class="news-item">
-      <div class="news-meta">
-        <span class="news-source">${e.date}</span>
-        <span class="badge ${importanceMap[e.importance]}">${importanceLabel[e.importance]}</span>
-      </div>
-      <div class="news-title">${e.event}</div>
+      <div class="news-meta"><span class="news-source">${e.date}</span><span class="badge ${importanceMap[e.importance]}">${importanceLabel[e.importance]}</span></div>
+      <div class="news-title"><a>${e.event}</a></div>
     </div>`).join('');
 }
 
 function switchTab(name, btn) {
-  ['news', 'indicators'].forEach(t => {
-    document.getElementById('tab-' + t).style.display = t === name ? '' : 'none';
-  });
+  ['news','indicators'].forEach(t => { document.getElementById('tab-'+t).style.display = t===name?'':'none'; });
   document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 }
-
-function refreshAll() {
-  fetchNews();
-}
+function refreshAll() { renderNews(); }
 
 renderTickers();
 renderIndicators();
-fetchNews();
+renderNews();
 </script>
 </body>
 </html>
