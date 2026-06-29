@@ -59,6 +59,9 @@
     .factor-item { font-size: 13px; line-height: 1.5; padding: 6px 0; display: flex; gap: 8px; align-items: flex-start; border-bottom: 0.5px solid var(--border); }
     .factor-item:last-child { border-bottom: none; }
     .factor-text { flex: 1; }
+    .factor-link { flex: 1; color: var(--text-primary); text-decoration: none; cursor: pointer; }
+    .factor-link:hover { color: var(--text-accent); }
+    .factor-link:hover .factor-date { color: var(--text-accent); }
     .impact { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: var(--radius); white-space: nowrap; flex-shrink: 0; }
     .impact-strong-up { background: var(--text-success); color: #fff; }
     .impact-mid-up { background: var(--bg-success); color: var(--text-success); }
@@ -90,6 +93,8 @@
     .forecast-prob { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
     .forecast-reason { font-size: 12px; color: var(--text-secondary); flex: 1; }
     .forecast-note { font-size: 10px; color: var(--text-muted); margin-top: 6px; }
+    .tech-signals { list-style: none; margin: 6px 0 0; }
+    .tech-signal { font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding: 1px 0; }
   </style>
 </head>
 <body>
@@ -228,14 +233,31 @@ function sortByImpact(arr) {
   return [...arr].sort((a, b) => (order[a.impact] ?? 1) - (order[b.impact] ?? 1));
 }
 
+function sortByDate(arr) {
+  // ニュースの根拠日時が新しい順（日付不明は末尾）
+  return [...arr].sort((a, b) => {
+    const da = a && a.date ? new Date(a.date) : null;
+    const db = b && b.date ? new Date(b.date) : null;
+    const va = da && !isNaN(da.getTime()) ? da.getTime() : -Infinity;
+    const vb = db && !isNaN(db.getTime()) ? db.getTime() : -Infinity;
+    return vb - va;
+  });
+}
+
 function renderFactor(item, dir) {
   // 古い形式（文字列）にも対応
   if (typeof item === 'string') {
     return `<li class="factor-item"><span class="factor-text">${item}</span></li>`;
   }
   const dateLabel = item.date ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${formatNewsDate(item.date)}${item.source ? '・' + item.source : ''}</span>` : (item.source ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${item.source}</span>` : '');
+  // 記事URLがあればクリックで開けるようにする
+  const hasUrl = item.url && /^https?:\/\//.test(item.url);
+  const textInner = `${item.text}${dateLabel}`;
+  const textBlock = hasUrl
+    ? `<a class="factor-link" href="${item.url}" target="_blank" rel="noopener">${textInner} <i class="ti ti-external-link" style="font-size:11px"></i></a>`
+    : `<span class="factor-text">${textInner}</span>`;
   return `<li class="factor-item">
-    <span class="factor-text">${item.text}${dateLabel}</span>
+    ${textBlock}
     <span class="impact ${impactClass(item.impact, dir)}">${dir === 'up' ? '上昇' : '下落'}・${item.impact || '中'}</span>
   </li>`;
 }
@@ -258,6 +280,24 @@ function renderForecast(f) {
     ${row('中期(1-3か月)', f.mid)}
     ${row('長期(3か月-1年)', f.long)}
     <div class="forecast-note">※AIによる参考予測です。投資判断はご自身の責任で行ってください。</div>
+  </div>`;
+}
+
+function renderTechnical(t) {
+  if (!t) return '';
+  const dirLabel = { up: '上昇', flat: '横ばい', down: '下降' };
+  const dirClass = { up: 'dir-up', flat: 'dir-flat', down: 'dir-down' };
+  const signals = (t.signals || []).map(s => `<li class="tech-signal">・${s}</li>`).join('');
+  return `<div class="forecast">
+    <div class="forecast-title"><i class="ti ti-chart-candle" style="font-size:13px"></i> テクニカル分析</div>
+    <div class="forecast-row">
+      <span class="forecast-term">総合判断</span>
+      <span class="forecast-dir ${dirClass[t.direction] || 'dir-flat'}">${dirLabel[t.direction] || '横ばい'}</span>
+      <span class="forecast-prob">可能性${t.probability || '中'}</span>
+    </div>
+    ${signals ? `<ul class="tech-signals">${signals}</ul>` : ''}
+    ${t.summary ? `<div class="forecast-reason" style="margin-top:6px">${t.summary}</div>` : ''}
+    <div class="forecast-note">※チャート指標はAIが調べた範囲の参考情報です。リアルタイムの正確な値ではありません。</div>
   </div>`;
 }
 
@@ -303,8 +343,8 @@ function renderResults(analysis) {
   const sentClass = { up: 'badge-up', down: 'badge-down', neutral: 'badge-neutral' };
 
   results.innerHTML = analyzedAt + analysis.map(a => {
-    const bull = sortByImpact(a.bullish || []);
-    const bear = sortByImpact(a.bearish || []);
+    const bull = sortByDate(a.bullish || []);
+    const bear = sortByDate(a.bearish || []);
     return `
     <div class="card">
       <div class="card-header">
@@ -314,6 +354,7 @@ function renderResults(analysis) {
       </div>
       <div class="card-summary">${a.summary || ''}</div>
       ${a.forecast ? renderForecast(a.forecast) : ''}
+      ${a.technical ? renderTechnical(a.technical) : ''}
       ${bull.length ? `
         <div class="factor-group">
           <div class="factor-label bull"><i class="ti ti-trending-up"></i> 上昇要因</div>
