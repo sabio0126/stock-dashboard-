@@ -221,7 +221,7 @@ function renderFactor(item, dir) {
   if (typeof item === 'string') {
     return `<li class="factor-item"><span class="factor-text">${item}</span></li>`;
   }
-  const dateLabel = item.date ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${formatNewsDate(item.date)} のニュース</span>` : '';
+  const dateLabel = item.date ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${formatNewsDate(item.date)}${item.source ? '・' + item.source : ''}</span>` : (item.source ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${item.source}</span>` : '');
   return `<li class="factor-item">
     <span class="factor-text">${item.text}${dateLabel}</span>
     <span class="impact ${impactClass(item.impact, dir)}">${dir === 'up' ? '上昇' : '下落'}・${item.impact || '中'}</span>
