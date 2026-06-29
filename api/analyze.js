@@ -28,6 +28,10 @@ export default async function handler(req, res) {
 - "中"：ある程度の影響が見込まれる要因
 - "弱"：限定的な影響にとどまる要因
 
+各要因について、その根拠となったニュースの日付も "date" として付けてください（例："2026-06-28"）。日付が不明な場合は空文字 "" にしてください。
+
+さらに、各銘柄について「今後2か月以内に予定されている、株価に影響を及ぼしそうなイベント」も調べてください。例：決算発表、新製品発表、株主総会、製品ローンチ、規制当局の判断期日、重要な業界カンファレンスなど。予定が見つからない場合は空配列にしてください。
+
 対象銘柄：${tickerList}
 
 以下のJSON形式のみで回答してください（前置きや説明は不要）：
@@ -38,10 +42,13 @@ export default async function handler(req, res) {
       "sentiment": "up または down または neutral",
       "summary": "一言での総括（30文字以内）",
       "bullish": [
-        { "text": "上昇要因の内容", "impact": "強 または 中 または 弱" }
+        { "text": "上昇要因の内容", "impact": "強 または 中 または 弱", "date": "YYYY-MM-DD" }
       ],
       "bearish": [
-        { "text": "下落要因の内容", "impact": "強 または 中 または 弱" }
+        { "text": "下落要因の内容", "impact": "強 または 中 または 弱", "date": "YYYY-MM-DD" }
+      ],
+      "events": [
+        { "date": "YYYY-MM-DD", "title": "イベント名", "impact": "強 または 中 または 弱" }
       ]
     }
   ]
@@ -79,6 +86,19 @@ export default async function handler(req, res) {
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
+
+    // 使用トークン数を取得して概算料金を計算（Haiku 4.5: 入力$1 / 出力$5 per 1M）
+    const usage = data.usage || {};
+    const inputTokens = usage.input_tokens || 0;
+    const outputTokens = usage.output_tokens || 0;
+    const costUsd = (inputTokens * 1 / 1000000) + (outputTokens * 5 / 1000000);
+
+    parsed.usage = {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_usd: costUsd
+    };
+
     return res.status(200).json(parsed);
 
   } catch (error) {
