@@ -66,6 +66,18 @@
     .impact-strong-down { background: var(--text-danger); color: #fff; }
     .impact-mid-down { background: var(--bg-danger); color: var(--text-danger); }
     .impact-weak-down { background: var(--surface-1); color: var(--text-danger); border: 0.5px solid var(--border); }
+    .analyzed-at { font-size: 12px; color: var(--text-muted); text-align: center; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .factor-date { font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px; }
+    .factor-label.event { color: var(--text-accent); }
+    .event-item { font-size: 13px; line-height: 1.5; padding: 6px 0; display: flex; gap: 8px; align-items: flex-start; border-bottom: 0.5px solid var(--border); }
+    .event-item:last-child { border-bottom: none; }
+    .event-date { font-size: 12px; font-weight: 500; color: var(--text-accent); white-space: nowrap; flex-shrink: 0; min-width: 78px; }
+    .event-title { flex: 1; }
+    .usage-bar { background: var(--surface-1); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 12px; }
+    .usage-item { display: flex; flex-direction: column; gap: 2px; }
+    .usage-label { color: var(--text-muted); font-size: 11px; }
+    .usage-value { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+    .usage-note { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -81,6 +93,8 @@
 </div>
 
 <div class="ticker-tags" id="tickerTags"></div>
+
+<div class="usage-bar" id="usageBar"></div>
 
 <button class="analyze-btn" id="analyzeBtn" onclick="analyze()">
   <i class="ti ti-sparkles"></i> AIに影響度を分析させる
@@ -98,6 +112,40 @@ function loadTickers() {
 function saveTickers(t) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); } catch(e) {} }
 
 let activeTickers = loadTickers();
+
+const USAGE_KEY = 'stock_dashboard_usage';
+
+function loadUsage() {
+  try { const s = localStorage.getItem(USAGE_KEY); return s ? JSON.parse(s) : { totalCost: 0, count: 0 }; } catch(e) { return { totalCost: 0, count: 0 }; }
+}
+function saveUsage(u) { try { localStorage.setItem(USAGE_KEY, JSON.stringify(u)); } catch(e) {} }
+
+function renderUsage(lastCost) {
+  const u = loadUsage();
+  const bar = document.getElementById('usageBar');
+  const yen = (usd) => '約' + Math.round(usd * 155) + '円';
+  bar.innerHTML = `
+    <div class="usage-item">
+      <span class="usage-label">今回の料金</span>
+      <span class="usage-value">$${(lastCost || 0).toFixed(4)} <span style="font-size:11px;color:var(--text-muted)">(${yen(lastCost || 0)})</span></span>
+    </div>
+    <div class="usage-item">
+      <span class="usage-label">累計料金</span>
+      <span class="usage-value">$${u.totalCost.toFixed(4)} <span style="font-size:11px;color:var(--text-muted)">(${yen(u.totalCost)})</span></span>
+    </div>
+    <div class="usage-item">
+      <span class="usage-label">分析回数</span>
+      <span class="usage-value">${u.count} 回</span>
+    </div>
+    <button onclick="resetUsage()" style="margin-left:auto;font-size:11px;padding:4px 10px">累計リセット</button>
+    <div class="usage-note" style="width:100%">※累計はこの端末での概算です。正確な請求額は<a href="https://console.anthropic.com/settings/billing" target="_blank" style="color:var(--text-accent)">Anthropic Console</a>で確認できます。</div>
+  `;
+}
+
+function resetUsage() {
+  saveUsage({ totalCost: 0, count: 0 });
+  renderUsage(0);
+}
 
 function renderTickers() {
   document.getElementById('tickerTags').innerHTML = activeTickers.map(t =>
@@ -132,6 +180,15 @@ async function analyze() {
 
     if (data.error) throw new Error(data.error);
 
+    // 使用量を記録
+    if (data.usage) {
+      const u = loadUsage();
+      u.totalCost += data.usage.cost_usd || 0;
+      u.count += 1;
+      saveUsage(u);
+      renderUsage(data.usage.cost_usd || 0);
+    }
+
     if (data.raw) {
       results.innerHTML = `<div class="card"><div style="font-size:14px;line-height:1.6;white-space:pre-wrap">${data.raw}</div></div>`;
       return;
@@ -164,9 +221,40 @@ function renderFactor(item, dir) {
   if (typeof item === 'string') {
     return `<li class="factor-item"><span class="factor-text">${item}</span></li>`;
   }
+  const dateLabel = item.date ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${formatNewsDate(item.date)} のニュース</span>` : '';
   return `<li class="factor-item">
-    <span class="factor-text">${item.text}</span>
+    <span class="factor-text">${item.text}${dateLabel}</span>
     <span class="impact ${impactClass(item.impact, dir)}">${dir === 'up' ? '上昇' : '下落'}・${item.impact || '中'}</span>
+  </li>`;
+}
+
+function formatNewsDate(dateStr) {
+  // "2026-06-28" → "6月28日" のように整形。失敗したらそのまま返す
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function sortEvents(events) {
+  return [...events].sort((a, b) => {
+    const da = new Date(a.date), db = new Date(b.date);
+    if (isNaN(da.getTime())) return 1;
+    if (isNaN(db.getTime())) return -1;
+    return da - db;
+  });
+}
+
+function renderEvent(ev) {
+  const d = new Date(ev.date);
+  let dateLabel = ev.date;
+  if (!isNaN(d.getTime())) {
+    dateLabel = d.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+  }
+  const impactBadge = ev.impact ? `<span class="impact ${impactClass(ev.impact, 'up')}" style="background:var(--bg-accent);color:var(--text-accent)">影響${ev.impact}</span>` : '';
+  return `<li class="event-item">
+    <span class="event-date">${dateLabel}</span>
+    <span class="event-title">${ev.title}</span>
+    ${impactBadge}
   </li>`;
 }
 
@@ -174,10 +262,14 @@ function renderResults(analysis) {
   const results = document.getElementById('results');
   if (!analysis.length) { results.innerHTML = '<div class="loading">結果がありませんでした</div>'; return; }
 
+  const now = new Date();
+  const dateStr = now.toLocaleString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const analyzedAt = `<div class="analyzed-at"><i class="ti ti-clock"></i> ${dateStr} 時点の分析</div>`;
+
   const sentLabel = { up: '上昇傾向', down: '下落傾向', neutral: '中立' };
   const sentClass = { up: 'badge-up', down: 'badge-down', neutral: 'badge-neutral' };
 
-  results.innerHTML = analysis.map(a => {
+  results.innerHTML = analyzedAt + analysis.map(a => {
     const bull = sortByImpact(a.bullish || []);
     const bear = sortByImpact(a.bearish || []);
     return `
@@ -197,11 +289,17 @@ function renderResults(analysis) {
           <div class="factor-label bear"><i class="ti ti-trending-down"></i> 下落要因</div>
           <ul class="factor-list">${bear.map(b => renderFactor(b, 'down')).join('')}</ul>
         </div>` : ''}
+      ${a.events && a.events.length ? `
+        <div class="factor-group">
+          <div class="factor-label event"><i class="ti ti-calendar-event"></i> 今後の予定イベント（2か月以内）</div>
+          <ul class="factor-list">${sortEvents(a.events).map(ev => renderEvent(ev)).join('')}</ul>
+        </div>` : ''}
     </div>`;
   }).join('');
 }
 
 renderTickers();
+renderUsage(0);
 </script>
 </body>
 </html>
