@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="株価情報" />
+  <title>株価影響情報ダッシュボード</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --text-primary: #1a1a18; --text-secondary: #5f5e5a; --text-muted: #888780;
+      --text-accent: #185fa5; --text-success: #3b6d11; --text-danger: #a32d2d;
+      --text-warning: #854f0b; --surface-0: #f1efe8; --surface-1: #f7f6f1;
+      --surface-2: #ffffff; --border: rgba(0,0,0,0.12); --border-accent: #85b7eb;
+      --bg-accent: #e6f1fb; --bg-success: #eaf3de; --bg-danger: #fcebeb;
+      --bg-warning: #faeeda; --fill-accent: #378add; --radius: 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-primary: #e8e6df; --text-secondary: #b4b2a9; --text-muted: #888780;
+        --text-accent: #85b7eb; --text-success: #97c459; --text-danger: #f09595;
+        --text-warning: #ef9f27; --surface-0: #1c1c1a; --surface-1: #252522;
+        --surface-2: #2e2e2b; --border: rgba(255,255,255,0.1); --border-accent: #185fa5;
+        --bg-accent: #042c53; --bg-success: #173404; --bg-danger: #501313;
+        --bg-warning: #412402; --fill-accent: #378add;
+      }
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: var(--surface-0); color: var(--text-primary); min-height: 100vh; padding: 1rem; max-width: 680px; margin: 0 auto; }
+    .header { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; }
+    .header h1 { font-size: 18px; font-weight: 500; flex: 1; }
+    .search-row { display: flex; gap: 8px; margin-bottom: 1rem; }
+    .search-row input { flex: 1; padding: 8px 12px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--surface-2); color: var(--text-primary); font-size: 14px; outline: none; }
+    .search-row input:focus { border-color: var(--fill-accent); }
+    button { padding: 8px 16px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--surface-2); color: var(--text-primary); font-size: 14px; cursor: pointer; }
+    button:hover { background: var(--surface-1); }
+    .ticker-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+    .ticker-tag { font-size: 12px; padding: 4px 10px; border-radius: var(--radius); background: var(--bg-accent); color: var(--text-accent); border: 0.5px solid var(--border-accent); cursor: pointer; }
+    .analyze-btn { width: 100%; padding: 12px; font-size: 15px; font-weight: 500; background: var(--fill-accent); color: #fff; border: none; margin-bottom: 1.5rem; }
+    .analyze-btn:hover { opacity: 0.9; background: var(--fill-accent); }
+    .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .loading { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 14px; }
+    .error { padding: 1rem; color: var(--text-danger); font-size: 13px; background: var(--bg-danger); border-radius: var(--radius); margin-bottom: 1rem; }
+    .card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .card-ticker { font-size: 16px; font-weight: 500; }
+    .badge { font-size: 12px; padding: 3px 10px; border-radius: var(--radius); }
+    .badge-up { background: var(--bg-success); color: var(--text-success); }
+    .badge-down { background: var(--bg-danger); color: var(--text-danger); }
+    .badge-neutral { background: var(--surface-1); color: var(--text-secondary); border: 0.5px solid var(--border); }
+    .card-summary { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+    .factor-group { margin-top: 10px; }
+    .factor-label { font-size: 12px; font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+    .factor-label.bull { color: var(--text-success); }
+    .factor-label.bear { color: var(--text-danger); }
+    .factor-list { list-style: none; }
+    .factor-list li { font-size: 13px; line-height: 1.5; padding: 3px 0 3px 16px; position: relative; }
+    .factor-list li::before { content: '・'; position: absolute; left: 0; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <i class="ti ti-chart-line" style="font-size:22px;color:var(--text-accent)"></i>
+  <h1>株価影響情報ダッシュボード</h1>
+</div>
+
+<div class="search-row">
+  <input type="text" id="tickerInput" placeholder="銘柄を追加（例：AAPL、7203）" onkeydown="if(event.key==='Enter')addTicker()" />
+  <button onclick="addTicker()">追加</button>
+</div>
+
+<div class="ticker-tags" id="tickerTags"></div>
+
+<button class="analyze-btn" id="analyzeBtn" onclick="analyze()">
+  <i class="ti ti-sparkles"></i> AIに影響度を分析させる
+</button>
+
+<div id="results"></div>
+
+<script>
+const STORAGE_KEY = 'stock_dashboard_tickers_v3';
+const defaultTickers = ['NVDA', 'AAPL', '7203', '6758', 'SPY'];
+
+function loadTickers() {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : [...defaultTickers]; } catch(e) { return [...defaultTickers]; }
+}
+function saveTickers(t) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(t)); } catch(e) {} }
+
+let activeTickers = loadTickers();
+
+function renderTickers() {
+  document.getElementById('tickerTags').innerHTML = activeTickers.map(t =>
+    `<span class="ticker-tag" onclick="removeTicker('${t}')">${t} ×</span>`
+  ).join('');
+}
+function addTicker() {
+  const val = document.getElementById('tickerInput').value.trim().toUpperCase();
+  if (val && !activeTickers.includes(val)) { activeTickers.push(val); saveTickers(activeTickers); renderTickers(); }
+  document.getElementById('tickerInput').value = '';
+}
+function removeTicker(t) {
+  if (activeTickers.length === 1) return;
+  activeTickers = activeTickers.filter(x => x !== t);
+  saveTickers(activeTickers);
+  renderTickers();
+}
+
+async function analyze() {
+  const btn = document.getElementById('analyzeBtn');
+  const results = document.getElementById('results');
+  btn.disabled = true;
+  results.innerHTML = '<div class="loading">AIが最新ニュースを分析中です...（30秒ほどかかります）</div>';
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickers: activeTickers })
+    });
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    if (data.raw) {
+      results.innerHTML = `<div class="card"><div style="font-size:14px;line-height:1.6;white-space:pre-wrap">${data.raw}</div></div>`;
+      return;
+    }
+
+    renderResults(data.analysis || []);
+  } catch(e) {
+    results.innerHTML = `<div class="error">分析に失敗しました：${e.message}<br>しばらくしてからもう一度お試しください。</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderResults(analysis) {
+  const results = document.getElementById('results');
+  if (!analysis.length) { results.innerHTML = '<div class="loading">結果がありませんでした</div>'; return; }
+
+  const sentLabel = { up: '上昇傾向', down: '下落傾向', neutral: '中立' };
+  const sentClass = { up: 'badge-up', down: 'badge-down', neutral: 'badge-neutral' };
+
+  results.innerHTML = analysis.map(a => `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-ticker">${a.ticker}</span>
+        <span class="badge ${sentClass[a.sentiment] || 'badge-neutral'}">${sentLabel[a.sentiment] || '中立'}</span>
+      </div>
+      <div class="card-summary">${a.summary || ''}</div>
+      ${a.bullish && a.bullish.length ? `
+        <div class="factor-group">
+          <div class="factor-label bull"><i class="ti ti-trending-up"></i> 上昇要因</div>
+          <ul class="factor-list">${a.bullish.map(b => `<li>${b}</li>`).join('')}</ul>
+        </div>` : ''}
+      ${a.bearish && a.bearish.length ? `
+        <div class="factor-group">
+          <div class="factor-label bear"><i class="ti ti-trending-down"></i> 下落要因</div>
+          <ul class="factor-list">${a.bearish.map(b => `<li>${b}</li>`).join('')}</ul>
+        </div>` : ''}
+    </div>
+  `).join('');
+}
+
+renderTickers();
+</script>
+</body>
+</html>
