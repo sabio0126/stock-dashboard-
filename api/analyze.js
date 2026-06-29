@@ -23,6 +23,11 @@ export default async function handler(req, res) {
 
     const prompt = `あなたは株式アナリストです。以下の銘柄について、最新のニュースや市場動向をふまえて、それぞれの「上昇要因」と「下落要因」を分析してください。
 
+各要因には必ず「影響度」を付けてください。影響度は次の3段階で評価します：
+- "強"：株価を大きく動かす可能性が高い要因
+- "中"：ある程度の影響が見込まれる要因
+- "弱"：限定的な影響にとどまる要因
+
 対象銘柄：${tickerList}
 
 以下のJSON形式のみで回答してください（前置きや説明は不要）：
@@ -32,8 +37,12 @@ export default async function handler(req, res) {
       "ticker": "銘柄コード",
       "sentiment": "up または down または neutral",
       "summary": "一言での総括（30文字以内）",
-      "bullish": ["上昇要因1", "上昇要因2"],
-      "bearish": ["下落要因1", "下落要因2"]
+      "bullish": [
+        { "text": "上昇要因の内容", "impact": "強 または 中 または 弱" }
+      ],
+      "bearish": [
+        { "text": "下落要因の内容", "impact": "強 または 中 または 弱" }
+      ]
     }
   ]
 }`;
@@ -47,7 +56,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2000,
+        max_tokens: 3000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{ role: 'user', content: prompt }]
       })
@@ -59,13 +68,11 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: data.error.message });
     }
 
-    // テキスト部分を抽出
     const textContent = data.content
       .filter(c => c.type === 'text')
       .map(c => c.text)
       .join('\n');
 
-    // JSON部分を抽出
     const jsonMatch = textContent.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return res.status(200).json({ raw: textContent });
