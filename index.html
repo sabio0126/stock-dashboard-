@@ -138,6 +138,7 @@
 
 <div class="main-tabs">
   <button class="main-tab active" id="mtab-analyze" onclick="switchMainTab('analyze')">分析</button>
+  <button class="main-tab" id="mtab-saved" onclick="switchMainTab('saved')">保存した分析</button>
   <button class="main-tab" id="mtab-track" onclick="switchMainTab('track')">予測の的中率</button>
 </div>
 
@@ -146,6 +147,10 @@
     <i class="ti ti-sparkles"></i> AIに影響度を分析させる
   </button>
   <div id="results"></div>
+</div>
+
+<div id="view-saved" style="display:none">
+  <div id="savedList"></div>
 </div>
 
 <div id="view-track" style="display:none">
@@ -248,6 +253,8 @@ async function analyze() {
     renderResults(data.analysis || []);
     // AIの予測を的中率トラッキング用に保存
     recordPredictions(data.analysis || []);
+    // 分析結果そのものを保存
+    saveAnalysis(data.analysis || []);
   } catch(e) {
     results.innerHTML = `<div class="error">分析に失敗しました：${e.message}<br>しばらくしてからもう一度お試しください。</div>`;
   } finally {
@@ -269,15 +276,19 @@ function sortByImpact(arr) {
   return [...arr].sort((a, b) => (order[a.impact] ?? 1) - (order[b.impact] ?? 1));
 }
 
+function getItemTime(item) {
+  // datetime優先、なければ date を見る
+  const raw = (item && (item.datetime || item.date)) || '';
+  if (!raw) return -Infinity;
+  // "YYYY-MM-DD HH:MM" を Date が解釈できる形に
+  const norm = raw.replace(' ', 'T');
+  const d = new Date(norm);
+  return isNaN(d.getTime()) ? -Infinity : d.getTime();
+}
+
 function sortByDate(arr) {
-  // ニュースの根拠日時が新しい順（日付不明は末尾）
-  return [...arr].sort((a, b) => {
-    const da = a && a.date ? new Date(a.date) : null;
-    const db = b && b.date ? new Date(b.date) : null;
-    const va = da && !isNaN(da.getTime()) ? da.getTime() : -Infinity;
-    const vb = db && !isNaN(db.getTime()) ? db.getTime() : -Infinity;
-    return vb - va;
-  });
+  // ニュースの根拠日時が新しい順（日時不明は末尾）
+  return [...arr].sort((a, b) => getItemTime(b) - getItemTime(a));
 }
 
 function renderFactor(item, dir) {
@@ -285,7 +296,9 @@ function renderFactor(item, dir) {
   if (typeof item === 'string') {
     return `<li class="factor-item"><span class="factor-text">${item}</span></li>`;
   }
-  const dateLabel = item.date ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${formatNewsDate(item.date)}${item.source ? '・' + item.source : ''}</span>` : (item.source ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${item.source}</span>` : '');
+  const dtLabel = formatNewsDateTime(item.datetime || item.date);
+  const metaText = [dtLabel, item.source].filter(Boolean).join('・');
+  const dateLabel = metaText ? `<span class="factor-date"><i class="ti ti-news" style="font-size:11px"></i> ${metaText}</span>` : '';
   // 記事URLがあればクリックで開けるようにする
   const hasUrl = item.url && /^https?:\/\//.test(item.url);
   const textInner = `${item.text}${dateLabel}`;
@@ -344,6 +357,17 @@ function formatNewsDate(dateStr) {
   return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+function formatNewsDateTime(raw) {
+  if (!raw) return '';
+  const hasTime = /\d{1,2}:\d{2}/.test(raw);
+  const d = new Date(String(raw).replace(' ', 'T'));
+  if (isNaN(d.getTime())) return raw; // 解釈できなければそのまま
+  if (hasTime) {
+    return d.toLocaleString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 function sortEvents(events) {
   return [...events].sort((a, b) => {
     const da = new Date(a.date), db = new Date(b.date);
@@ -379,8 +403,11 @@ function renderResults(analysis) {
   const sentClass = { up: 'badge-up', down: 'badge-down', neutral: 'badge-neutral' };
 
   results.innerHTML = analyzedAt + analysis.map(a => {
-    const bull = sortByDate(a.bullish || []);
-    const bear = sortByDate(a.bearish || []);
+    // 上昇・下落をまとめて日時の新しい順に並べる（各項目に方向を保持）
+    const merged = [
+      ...(a.bullish || []).map(it => ({ item: it, dir: 'up' })),
+      ...(a.bearish || []).map(it => ({ item: it, dir: 'down' }))
+    ].sort((x, y) => getItemTime(y.item) - getItemTime(x.item));
     return `
     <div class="card">
       <div class="card-header">
@@ -391,19 +418,14 @@ function renderResults(analysis) {
       <div class="card-summary">${a.summary || ''}</div>
       ${a.forecast ? renderForecast(a.forecast) : ''}
       ${a.technical ? renderTechnical(a.technical) : ''}
-      ${bull.length ? `
+      ${merged.length ? `
         <div class="factor-group">
-          <div class="factor-label bull"><i class="ti ti-trending-up"></i> 上昇要因</div>
-          <ul class="factor-list">${bull.map(b => renderFactor(b, 'up')).join('')}</ul>
-        </div>` : ''}
-      ${bear.length ? `
-        <div class="factor-group">
-          <div class="factor-label bear"><i class="ti ti-trending-down"></i> 下落要因</div>
-          <ul class="factor-list">${bear.map(b => renderFactor(b, 'down')).join('')}</ul>
+          <div class="factor-label" style="color:var(--text-secondary)"><i class="ti ti-news"></i> 関連ニュース（新しい順・直近3日）</div>
+          <ul class="factor-list">${merged.map(m => renderFactor(m.item, m.dir)).join('')}</ul>
         </div>` : ''}
       ${a.events && a.events.length ? `
         <div class="factor-group">
-          <div class="factor-label event"><i class="ti ti-calendar-event"></i> 今後の予定イベント（4か月以内）</div>
+          <div class="factor-label event"><i class="ti ti-calendar-event"></i> 今後の予定イベント（1か月以内）</div>
           <ul class="factor-list">${sortEvents(a.events).map(ev => renderEvent(ev)).join('')}</ul>
         </div>` : ''}
     </div>`;
@@ -473,11 +495,84 @@ function deleteGroup(date, ticker) {
 }
 
 function switchMainTab(name) {
-  document.getElementById('view-analyze').style.display = name === 'analyze' ? '' : 'none';
-  document.getElementById('view-track').style.display = name === 'track' ? '' : 'none';
-  document.getElementById('mtab-analyze').classList.toggle('active', name === 'analyze');
-  document.getElementById('mtab-track').classList.toggle('active', name === 'track');
+  const views = ['analyze', 'saved', 'track'];
+  views.forEach(v => {
+    document.getElementById('view-' + v).style.display = name === v ? '' : 'none';
+    document.getElementById('mtab-' + v).classList.toggle('active', name === v);
+  });
   if (name === 'track') renderTrack();
+  if (name === 'saved') renderSaved();
+}
+
+// ===== 分析結果の保存 =====
+const SAVED_KEY = 'stock_dashboard_saved_analyses';
+
+function loadSaved() {
+  try { const s = localStorage.getItem(SAVED_KEY); return s ? JSON.parse(s) : []; } catch(e) { return []; }
+}
+function saveSavedList(list) { try { localStorage.setItem(SAVED_KEY, JSON.stringify(list)); } catch(e) {} }
+
+function saveAnalysis(analysis) {
+  if (!analysis || !analysis.length) return;
+  const list = loadSaved();
+  const now = new Date();
+  list.unshift({
+    id: 'a_' + Date.now(),
+    savedAt: now.toISOString(),
+    tickers: analysis.map(a => a.ticker),
+    analysis: analysis
+  });
+  // 保存は最大50件まで（古いものから削除）
+  if (list.length > 50) list.length = 50;
+  saveSavedList(list);
+}
+
+function deleteSaved(id) {
+  let list = loadSaved();
+  list = list.filter(x => x.id !== id);
+  saveSavedList(list);
+  renderSaved();
+}
+
+function renderSaved() {
+  const list = loadSaved();
+  const el = document.getElementById('savedList');
+  if (!list.length) {
+    el.innerHTML = '<div class="track-empty">まだ保存された分析がありません。<br>「分析」タブでAI分析を実行すると、結果がここに自動保存されます。</div>';
+    return;
+  }
+  el.innerHTML = list.map(entry => {
+    const d = new Date(entry.savedAt);
+    const dateDisp = d.toLocaleString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const tickers = (entry.tickers || []).join('、');
+    return `
+      <div class="track-card">
+        <div class="track-card-head">
+          <i class="ti ti-bookmark" style="font-size:14px;color:var(--text-accent)"></i>
+          <span class="track-card-ticker" style="font-size:13px">${tickers}</span>
+          <span class="track-card-date">${dateDisp}</span>
+        </div>
+        <button onclick="openSaved('${entry.id}')" style="font-size:12px;padding:6px 12px;margin-top:6px">この分析を表示</button>
+        <button class="track-delete" style="margin-left:8px" onclick="deleteSaved('${entry.id}')"><i class="ti ti-trash" style="font-size:11px"></i> 削除</button>
+        <div id="saved-detail-${entry.id}" style="margin-top:10px"></div>
+      </div>`;
+  }).join('');
+}
+
+function openSaved(id) {
+  const list = loadSaved();
+  const entry = list.find(x => x.id === id);
+  const detail = document.getElementById('saved-detail-' + id);
+  if (!entry || !detail) return;
+  // すでに開いていたら閉じる
+  if (detail.innerHTML) { detail.innerHTML = ''; return; }
+  // renderResultsと同じ描画を流用するため一時コンテナに描画して移植
+  const tmpId = 'results';
+  const realResults = document.getElementById(tmpId);
+  const backup = realResults.innerHTML;
+  renderResults(entry.analysis);
+  detail.innerHTML = realResults.innerHTML;
+  realResults.innerHTML = backup;
 }
 
 function renderTrack() {
